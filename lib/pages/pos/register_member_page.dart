@@ -1,10 +1,11 @@
+import 'dart:convert'; // Import untuk Base64
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:screenshot/screenshot.dart';
-import 'package:image_gallery_saver/image_gallery_saver.dart'; // Ganti SharePlus dengan ini
+import 'package:image_gallery_saver/image_gallery_saver.dart';
 
 class RegisterMemberPage extends StatefulWidget {
   const RegisterMemberPage({super.key});
@@ -18,22 +19,22 @@ class _RegisterMemberPageState extends State<RegisterMemberPage> {
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   
-  // Data Paket yang dipilih
+  // Data Paket
   String? _selectedPackageId;
   String? _selectedPackageName;
   int _selectedPackagePrice = 0;
-  int _selectedPackageDuration = 0; // Hari
+  int _selectedPackageDuration = 0;
   int _bonusDays = 0;
 
   bool _isLoading = false;
   
-  // Controller Screenshot (Untuk Download Kartu)
+  // Controller Screenshot
   final ScreenshotController _screenshotController = ScreenshotController();
 
   // FORMATTER
   final NumberFormat _currencyFormat = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
 
-  // --- LOGIC: SIMPAN MEMBER & TRANSAKSI ---
+  // --- LOGIC: SIMPAN DATA MEMBER ---
   Future<void> _processRegistration() async {
     if (_nameController.text.isEmpty || _phoneController.text.isEmpty || _selectedPackageId == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Mohon lengkapi semua data!"), backgroundColor: Colors.red));
@@ -43,18 +44,14 @@ class _RegisterMemberPageState extends State<RegisterMemberPage> {
     setState(() => _isLoading = true);
 
     try {
-      // 1. Generate ID Unik (Misal: MEM-timestamp)
       String memberId = "MEM${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}";
-      
-      // 2. Hitung Tanggal Expired
       DateTime now = DateTime.now();
       int totalDays = _selectedPackageDuration + _bonusDays;
       DateTime expiredDate = now.add(Duration(days: totalDays));
 
-      // 3. Batch Write (Agar Member & Transaksi tersimpan bersamaan)
       WriteBatch batch = FirebaseFirestore.instance.batch();
 
-      // A. Simpan ke Collection 'members'
+      // 1. Simpan Data Member (Awal)
       DocumentReference memberRef = FirebaseFirestore.instance.collection('members').doc(memberId);
       batch.set(memberRef, {
         'name': _nameController.text,
@@ -63,27 +60,27 @@ class _RegisterMemberPageState extends State<RegisterMemberPage> {
         'expiredDate': Timestamp.fromDate(expiredDate),
         'status': 'active',
         'currentPackage': _selectedPackageName,
-        'memberId': memberId, // QR Code akan berisi String ini
+        'memberId': memberId,
+        'cardBase64': "", // Nanti diisi setelah kartu digenerate
       });
 
-      // B. Simpan ke Collection 'transactions' (Agar masuk Laporan Admin)
+      // 2. Simpan Transaksi
       DocumentReference transRef = FirebaseFirestore.instance.collection('transactions').doc();
       batch.set(transRef, {
         'amount': _selectedPackagePrice,
         'date': Timestamp.now(),
-        'timestamp': Timestamp.now(), // Field untuk sorting
+        'timestamp': Timestamp.now(),
         'memberId': memberId,
         'memberName': _nameController.text,
         'packageName': _selectedPackageName,
-        'type': 'registration', // Tipe transaksi
+        'type': 'registration',
         'paymentMethod': 'Cash',
       });
 
-      // C. Commit Batch
       await batch.commit();
 
-      // 4. Tampilkan Kartu Member (Dialog)
       if (mounted) {
+        // Tampilkan Dialog untuk Generate Kartu
         _showSuccessDialog(memberId, _nameController.text, expiredDate);
       }
 
@@ -94,103 +91,112 @@ class _RegisterMemberPageState extends State<RegisterMemberPage> {
     }
   }
 
-  // --- UI: POPUP KARTU MEMBER SETELAH SUKSES ---
+  // --- UI: POPUP KARTU MEMBER (FIX NO SIZE ERROR) ---
   void _showSuccessDialog(String memberId, String name, DateTime expiry) {
     showDialog(
       context: context,
-      barrierDismissible: false, // User harus klik tombol tutup/download
+      barrierDismissible: false,
       builder: (context) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFF1E1E1E),
-          contentPadding: EdgeInsets.zero,
-          content: Column(
+        // Gunakan Dialog biasa + SingleChildScrollView untuk menghindari error layout
+        return Dialog(
+          backgroundColor: Colors.transparent, 
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Padding(
-                padding: EdgeInsets.all(16.0),
-                child: Text("Registrasi Berhasil!", style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 18)),
+              // Header Sukses
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E1E1E),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.greenAccent),
+                ),
+                child: const Text("Registrasi Berhasil! ✅", style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold)),
               ),
               
-              // WIDGET KARTU MEMBER (YANG AKAN DI-SCREENSHOT)
-              Screenshot(
-                controller: _screenshotController,
-                child: Container(
-                  width: 300,
-                  height: 450,
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF121212), Color(0xFF2C2C2C)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFFFD700), width: 2),
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // Logo / Nama Gym
-                      const Icon(Icons.fitness_center, color: Color(0xFFFFD700), size: 40),
-                      const SizedBox(height: 10),
-                      const Text("GOLDEN GYM", style: TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.bold, fontSize: 20, letterSpacing: 2)),
-                      const Text("MEMBER CARD", style: TextStyle(color: Colors.grey, fontSize: 10, letterSpacing: 5)),
-                      const Divider(color: Colors.grey, height: 30),
+              const SizedBox(height: 20),
 
-                      // Nama Member
-                      Text(name.toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 22), textAlign: TextAlign.center),
-                      const SizedBox(height: 5),
-                      Text("ID: $memberId", style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                      
-                      const SizedBox(height: 20),
-                      
-                      // QR CODE (BACKGROUND PUTIH AGAR BISA DI-SCAN)
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10)),
-                        child: QrImageView(
-                          data: memberId, // Data QR adalah ID Member
-                          version: QrVersions.auto,
-                          size: 140.0,
-                          backgroundColor: Colors.white,
+              // --- BAGIAN KARTU YANG AKAN DI-SCREENSHOT ---
+              Center(
+                child: SingleChildScrollView(
+                  child: Screenshot(
+                    controller: _screenshotController,
+                    // Container ini WAJIB punya width fix agar tidak error "No Size"
+                    child: Container(
+                      width: 320, 
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF000000), Color(0xFF2C2C2C)], 
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         ),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFFFD700), width: 3),
                       ),
-                      
-                      const SizedBox(height: 20),
-                      Text("Valid Until: ${DateFormat('dd MMM yyyy').format(expiry)}", style: const TextStyle(color: Color(0xFFFFD700), fontSize: 12)),
-                    ],
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.fitness_center, color: Color(0xFFFFD700), size: 30),
+                          const SizedBox(height: 5),
+                          const Text("GOLDEN GYM", style: TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 2)),
+                          const SizedBox(height: 20),
+                          
+                          Text(name.toUpperCase(), 
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20), 
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                          ),
+                          Text("ID: $memberId", style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                          
+                          const SizedBox(height: 15),
+                          
+                          // QR CODE (Wajib background putih)
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
+                            child: QrImageView(
+                              data: memberId,
+                              version: QrVersions.auto,
+                              size: 140.0,
+                              backgroundColor: Colors.white,
+                              padding: EdgeInsets.zero,
+                            ),
+                          ),
+                          
+                          const SizedBox(height: 15),
+                          Text("Valid Until: ${DateFormat('dd MMM yyyy').format(expiry)}", style: const TextStyle(color: Color(0xFFFFD700), fontSize: 11)),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 30),
               
               // TOMBOL ACTION
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () {
-                          Navigator.pop(context); // Tutup Dialog
-                          Navigator.pop(context); // Kembali ke Home POS
-                        },
-                        style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.grey)),
-                        child: const Text("Tutup", style: TextStyle(color: Colors.white)),
-                      ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  TextButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      Navigator.pop(context);
+                    },
+                    child: const Text("Tutup", style: TextStyle(color: Colors.grey)),
+                  ),
+                  const SizedBox(width: 10),
+                  ElevatedButton.icon(
+                    onPressed: () => _saveCardAndBase64(memberId), // Update Logic
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFFFD700),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: _downloadMemberCard, // FUNGSI BARU (DOWNLOAD SAJA)
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                        icon: const Icon(Icons.download, color: Colors.white, size: 18),
-                        label: const Text("Download", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                      ),
-                    ),
-                  ],
-                ),
+                    icon: const Icon(Icons.download_rounded, color: Colors.black, size: 18),
+                    label: const Text("Simpan Kartu", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                  ),
+                ],
               )
             ],
           ),
@@ -199,43 +205,43 @@ class _RegisterMemberPageState extends State<RegisterMemberPage> {
     );
   }
 
-  // --- LOGIC BARU: DOWNLOAD KE GALERI ---
-  Future<void> _downloadMemberCard() async {
+  // --- LOGIC: SIMPAN GALERI & UPDATE BASE64 KE FIRESTORE ---
+  Future<void> _saveCardAndBase64(String memberId) async {
     try {
-      // 1. Tangkap Layar Widget Kartu
-      final Uint8List? imageBytes = await _screenshotController.capture();
+      // 1. Capture Screenshot
+      // pixelRatio 2.0 agar kualitas bagus tapi size tidak terlalu besar (agar muat di Firestore)
+      final Uint8List? imageBytes = await _screenshotController.capture(pixelRatio: 2.0); 
       
       if (imageBytes != null) {
-        // 2. Simpan ke Galeri menggunakan ImageGallerySaver
-        final String fileName = "GoldenGym_Card_${DateTime.now().millisecondsSinceEpoch}";
+        
+        // A. Simpan ke Galeri HP
+        final String fileName = "GoldenGym_${DateTime.now().millisecondsSinceEpoch}";
         final result = await ImageGallerySaver.saveImage(
           imageBytes,
-          quality: 100,
+          quality: 80,
           name: fileName
         );
 
-        // 3. Beri Notifikasi
+        // B. Konversi ke Base64 & Update Firestore (Tanpa Storage)
+        String base64String = base64Encode(imageBytes);
+        
+        await FirebaseFirestore.instance.collection('members').doc(memberId).update({
+          'cardBase64': base64String, // Data gambar tersimpan di dokumen
+        });
+
+        // C. Feedback User
         if (result['isSuccess'] == true || result != null) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text("Berhasil disimpan ke Galeri!"), 
-                backgroundColor: Colors.green
-              )
+              const SnackBar(content: Text("Kartu disimpan di Galeri & Database! ✅"), backgroundColor: Colors.green)
             );
-            // Opsional: Tutup dialog setelah download
-            // Navigator.pop(context); 
-            // Navigator.pop(context); 
           }
-        } else {
-           throw Exception("Gagal menyimpan");
         }
       }
     } catch (e) {
-      print("Error saving: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-           SnackBar(content: Text("Gagal menyimpan: $e"), backgroundColor: Colors.red)
+           SnackBar(content: Text("Gagal: $e. Coba Restart Aplikasi."), backgroundColor: Colors.red)
         );
       }
     }
@@ -268,7 +274,6 @@ class _RegisterMemberPageState extends State<RegisterMemberPage> {
             const Text("2. Pilih Paket Membership", style: TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.bold, fontSize: 16)),
             const SizedBox(height: 15),
             
-            // STREAM PAKET DARI FIREBASE
             StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance.collection('packages').where('isActive', isEqualTo: true).snapshots(),
               builder: (context, snapshot) {
@@ -276,8 +281,18 @@ class _RegisterMemberPageState extends State<RegisterMemberPage> {
                 
                 var packages = snapshot.data!.docs;
 
-                return Column(
-                  children: packages.map((doc) {
+                return GridView.builder(
+                  shrinkWrap: true, 
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2, 
+                    childAspectRatio: 1.1,
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 10,
+                  ),
+                  itemCount: packages.length,
+                  itemBuilder: (context, index) {
+                    var doc = packages[index];
                     var data = doc.data() as Map<String, dynamic>;
                     bool isSelected = _selectedPackageId == doc.id;
                     bool hasBonus = (data['bonusDays'] ?? 0) > 0;
@@ -292,37 +307,39 @@ class _RegisterMemberPageState extends State<RegisterMemberPage> {
                           _bonusDays = data['bonusDays'] ?? 0;
                         });
                       },
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 10),
-                        padding: const EdgeInsets.all(16),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: isSelected ? const Color(0xFFFFD700).withOpacity(0.2) : const Color(0xFF1E1E1E),
-                          border: Border.all(color: isSelected ? const Color(0xFFFFD700) : Colors.white10),
-                          borderRadius: BorderRadius.circular(12),
+                          color: isSelected ? const Color(0xFFFFD700) : const Color(0xFF1E1E1E),
+                          border: Border.all(
+                            color: isSelected ? const Color(0xFFFFD700) : Colors.white10,
+                            width: 2
+                          ),
+                          borderRadius: BorderRadius.circular(16),
                         ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(data['name'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                                Text("${data['duration']} Hari ${hasBonus ? '+ Bonus' : ''}", style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                              ],
-                            ),
-                            Text(_currencyFormat.format(data['price']), style: TextStyle(color: isSelected ? const Color(0xFFFFD700) : Colors.white, fontWeight: FontWeight.bold)),
+                            Icon(Icons.card_membership_rounded, color: isSelected ? Colors.black : const Color(0xFFFFD700), size: 32),
+                            const SizedBox(height: 8),
+                            Text(data['name'], style: TextStyle(color: isSelected ? Colors.black : Colors.white, fontWeight: FontWeight.bold, fontSize: 14), textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis),
+                            const SizedBox(height: 4),
+                            Text("${data['duration']} Hari ${hasBonus ? '+ Bonus' : ''}", style: TextStyle(color: isSelected ? Colors.black87 : Colors.grey, fontSize: 10)),
+                            const SizedBox(height: 8),
+                            Text(_currencyFormat.format(data['price']), style: TextStyle(color: isSelected ? Colors.black : const Color(0xFFFFD700), fontWeight: FontWeight.bold, fontSize: 13)),
                           ],
                         ),
                       ),
                     );
-                  }).toList(),
+                  },
                 );
               },
             ),
 
             const SizedBox(height: 30),
 
-            // STEP 3: RINGKASAN & PEMBAYARAN
+            // STEP 3: BAYAR
             if (_selectedPackageId != null) ...[
               const Divider(color: Colors.grey),
               const SizedBox(height: 10),
@@ -358,6 +375,8 @@ class _RegisterMemberPageState extends State<RegisterMemberPage> {
                 ),
               ),
             ],
+            
+            const SizedBox(height: 50),
           ],
         ),
       ),
