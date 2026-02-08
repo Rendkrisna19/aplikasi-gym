@@ -228,46 +228,89 @@ class _HomeAdminPageState extends State<HomeAdminPage> {
       ],
     );
   }
-
-  // --- WIDGET BUILDERS ---
+// --- WIDGET BUILDERS ---
 
   Widget _buildHeader() {
     final User? user = FirebaseAuth.instance.currentUser;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+      // Menggunakan StreamBuilder agar update Realtime (tanpa refresh)
       child: StreamBuilder<DocumentSnapshot>(
         stream: FirebaseFirestore.instance.collection('users').doc(user?.uid).snapshots(),
         builder: (context, snapshot) {
+          // 1. Default Value (Jika loading atau data kosong)
           String displayName = "Admin";
-          ImageProvider avatarImage = const NetworkImage("https://i.pravatar.cc/150?img=12");
+          
+          // Gambar Default (Placeholder yang cocok dengan tema Black & Gold)
+          ImageProvider avatarImage = const NetworkImage(
+            "https://ui-avatars.com/api/?name=Admin&background=1E1E1E&color=FFD700&size=150"
+          );
 
-          if (snapshot.hasData && snapshot.data!.exists) {
+          // 2. Cek Data dari Firestore
+          if (snapshot.hasData && snapshot.data != null && snapshot.data!.exists) {
             var data = snapshot.data!.data() as Map<String, dynamic>;
+            
+            // Ambil Nama
             displayName = data['name'] ?? "Admin";
-            if (data['profileImage'] != null && data['profileImage'].toString().isNotEmpty) {
+
+            // 3. Logika Tampilkan Foto Base64
+            // Pastikan field-nya sama dengan di SettingsPage ('profileImage')
+            String? base64String = data['profileImage']; 
+            
+            if (base64String != null && base64String.isNotEmpty) {
               try {
-                avatarImage = MemoryImage(base64Decode(data['profileImage']));
-              } catch (e) { /* Fallback */ }
+                // Decode String Base64 menjadi Gambar Memory
+                avatarImage = MemoryImage(base64Decode(base64String));
+              } catch (e) {
+                debugPrint("Gagal decode gambar di header: $e");
+                // Jika error, dia akan tetap pakai avatarImage default di atas
+              }
             }
           }
 
+          // 4. Render UI
           return Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text("Selamat Datang,", style: TextStyle(color: Colors.grey, fontSize: 14)),
-                  Text(displayName, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+                  const Text(
+                    "Selamat Datang,", 
+                    style: TextStyle(color: Colors.grey, fontSize: 14)
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    displayName, 
+                    style: const TextStyle(
+                      color: Colors.white, 
+                      fontSize: 22, 
+                      fontWeight: FontWeight.bold
+                    )
+                  ),
                 ],
               ),
+              
+              // Container Foto Profil
               Container(
-                width: 50, height: 50,
+                width: 55, 
+                height: 55,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFFFFD700), width: 2),
-                  image: DecorationImage(image: avatarImage, fit: BoxFit.cover),
+                  color: const Color(0xFF1E1E1E), // Background jika gambar transparan
+                  border: Border.all(color: const Color(0xFFFFD700), width: 2), // Border Emas
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFFFD700).withOpacity(0.2),
+                      blurRadius: 10,
+                      spreadRadius: 1
+                    )
+                  ],
+                  image: DecorationImage(
+                    image: avatarImage, 
+                    fit: BoxFit.cover
+                  ),
                 ),
               ),
             ],
