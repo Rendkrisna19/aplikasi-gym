@@ -19,7 +19,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
 environment:
-  sdk: ">=3.8.0 <4.0.0"
+  sdk: ^3.10.8
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -43,8 +43,8 @@ dependencies:
   screenshot: ^3.0.0    # Untuk menangkap layar (download kartu)
   share_plus: ^10.0.0   # Untuk mengirim file ke WA
   path_provider: ^2.1.2
-  image_gallery_saver: ^2.0.3  # WAJIB UNTUK DOWNLOAD KE GALERI
   mobile_scanner: ^5.1.0  # Untuk Scan Kamera & Analisa Gambar Galeri
+  image_gallery_saver_plus: ^4.0.1
 
 dev_dependencies:
   flutter_test:
