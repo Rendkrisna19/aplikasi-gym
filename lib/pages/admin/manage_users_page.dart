@@ -13,48 +13,132 @@ class ManageUsersPage extends StatefulWidget {
 class _ManageUsersPageState extends State<ManageUsersPage> {
   bool _isLoading = false;
 
-  // --- FUNGSI TAMBAH AKUN POS ---
-  // Trik: Kita menggunakan 'Secondary App' agar saat create user baru,
-  // Admin yang sedang login TIDAK log out.
+  // Warna Tema
+  final Color _goldColor = const Color(0xFFFFD700);
+  final Color _cardColor = const Color(0xFF1E1E1E);
+  final Color _bgColor = const Color(0xFF121212);
+
+  // --- FUNGSI TAMBAH AKUN POS (MODAL BESAR) ---
   Future<void> _showAddUserDialog() async {
     final emailCtrl = TextEditingController();
     final passwordCtrl = TextEditingController();
     final nameCtrl = TextEditingController();
+    bool isPasswordVisible = false;
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1E1E1E),
-        title: const Text("Tambah Akun Kasir (POS)", style: TextStyle(color: Colors.white)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildTextField("Nama Staff", nameCtrl, Icons.person),
-            const SizedBox(height: 10),
-            _buildTextField("Email Login", emailCtrl, Icons.email),
-            const SizedBox(height: 10),
-            _buildTextField("Password", passwordCtrl, Icons.lock, isPassword: true),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Batal", style: TextStyle(color: Colors.grey)),
+      builder: (context) {
+        return Dialog(
+          backgroundColor: _cardColor,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          insetPadding: const EdgeInsets.all(20),
+          child: StatefulBuilder(
+            builder: (context, setDialogState) {
+              return Container(
+                width: double.infinity,
+                constraints: const BoxConstraints(maxWidth: 500), // Responsive Max Width
+                padding: const EdgeInsets.all(24),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Header Modal
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(color: _goldColor.withOpacity(0.2), shape: BoxShape.circle),
+                            child: Icon(Icons.person_add_rounded, color: _goldColor, size: 28),
+                          ),
+                          const SizedBox(width: 15),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text("Tambah Staff Kasir", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20)),
+                                Text("Buat akun login untuk POS", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      
+                      const SizedBox(height: 30),
+
+                      // Input Form
+                      _buildModernInput(nameCtrl, "Nama Lengkap", "Contoh: Budi Santoso", Icons.badge_outlined),
+                      const SizedBox(height: 15),
+                      _buildModernInput(emailCtrl, "Email Login", "staff@gym.com", Icons.alternate_email),
+                      const SizedBox(height: 15),
+                      
+                      // Password Field (Custom)
+                      Text("Password", style: const TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: passwordCtrl,
+                        obscureText: !isPasswordVisible,
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        decoration: InputDecoration(
+                          hintText: "Minimal 6 karakter",
+                          hintStyle: TextStyle(color: Colors.grey.withOpacity(0.4)),
+                          prefixIcon: Icon(Icons.lock_outline, color: _goldColor, size: 20),
+                          suffixIcon: IconButton(
+                            icon: Icon(isPasswordVisible ? Icons.visibility : Icons.visibility_off, color: Colors.grey),
+                            onPressed: () => setDialogState(() => isPasswordVisible = !isPasswordVisible),
+                          ),
+                          filled: true,
+                          fillColor: Colors.black26,
+                          contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: _goldColor)),
+                        ),
+                      ),
+
+                      const SizedBox(height: 30),
+
+                      // Action Buttons
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+                              child: const Text("Batal", style: TextStyle(color: Colors.grey, fontSize: 16)),
+                            ),
+                          ),
+                          const SizedBox(width: 15),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () async {
+                                if (emailCtrl.text.isEmpty || passwordCtrl.text.isEmpty) return;
+                                Navigator.pop(context); // Tutup dialog
+                                await _registerPosUser(emailCtrl.text, passwordCtrl.text, nameCtrl.text);
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: _goldColor,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                elevation: 5,
+                                shadowColor: _goldColor.withOpacity(0.4),
+                              ),
+                              child: const Text("BUAT AKUN", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 16)),
+                            ),
+                          ),
+                        ],
+                      )
+                    ],
+                  ),
+                ),
+              );
+            }
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFFD700)),
-            onPressed: () async {
-              if (emailCtrl.text.isEmpty || passwordCtrl.text.isEmpty) return;
-              Navigator.pop(context); // Tutup dialog dulu
-              await _registerPosUser(emailCtrl.text, passwordCtrl.text, nameCtrl.text);
-            },
-            child: const Text("Buat Akun", style: TextStyle(color: Colors.black)),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
+  // --- LOGIC REGISTER (TIDAK BERUBAH) ---
   Future<void> _registerPosUser(String email, String password, String name) async {
     setState(() => _isLoading = true);
     try {
@@ -82,7 +166,12 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Akun Kasir Berhasil Dibuat!"), backgroundColor: Color(0xFFFFD700)),
+          SnackBar(
+            content: const Row(children: [Icon(Icons.check_circle, color: Colors.white), SizedBox(width: 10), Text("Akun Kasir Berhasil Dibuat!")]),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
         );
       }
     } catch (e) {
@@ -96,20 +185,22 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
     }
   }
 
-  // --- HAPUS USER (Hanya Hapus Data di Firestore) ---
-  // Catatan: Menghapus Auth user butuh Admin SDK (Backend), 
-  // jadi di client side kita hanya hapus akses di Firestore agar tidak bisa login.
-  void _deleteUser(String uid) {
+  // --- HAPUS USER (CONFIRMATION) ---
+  void _deleteUser(String uid, String name) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1E1E1E),
-        title: const Text("Hapus Akses?", style: TextStyle(color: Colors.red)),
-        content: const Text("Staff ini tidak akan bisa login lagi.", style: TextStyle(color: Colors.grey)),
+        backgroundColor: _cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text("Hapus Akses?", style: TextStyle(color: Colors.white)),
+        content: Text("Staff '$name' tidak akan bisa login lagi ke aplikasi POS.", style: const TextStyle(color: Colors.grey)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Batal")),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Batal", style: TextStyle(color: Colors.grey))),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
             onPressed: () async {
               await FirebaseFirestore.instance.collection('users').doc(uid).delete();
               if (mounted) Navigator.pop(context);
@@ -123,100 +214,149 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        // HEADER
-        Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: const Color(0xFF1E1E1E),
-            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(30)),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 10)],
+    return Scaffold( // Pakai Scaffold agar aman
+      backgroundColor: _bgColor,
+      body: Column(
+        children: [
+          // HEADER HALAMAN
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 10),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("Manajemen Staff", style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+                    Text("Kelola akun kasir (POS)", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                  ],
+                ),
+                // Tombol Tambah
+                Container(
+                  decoration: BoxDecoration(
+                    color: _goldColor,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [BoxShadow(color: _goldColor.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 2))]
+                  ),
+                  child: IconButton(
+                    onPressed: _isLoading ? null : _showAddUserDialog,
+                    icon: _isLoading 
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2)) 
+                      : const Icon(Icons.person_add_rounded, color: Colors.black, size: 28),
+                  ),
+                )
+              ],
+            ),
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text("Manajemen Staff", style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
-                  Text("Kelola akun kasir (POS)", style: TextStyle(color: Colors.grey, fontSize: 14)),
-                ],
-              ),
-              IconButton(
-                onPressed: _isLoading ? null : _showAddUserDialog,
-                style: IconButton.styleFrom(backgroundColor: const Color(0xFFFFD700)),
-                icon: _isLoading 
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) 
-                  : const Icon(Icons.person_add, color: Colors.black),
-              )
-            ],
-          ),
-        ),
 
-        // LIST USER
-        Expanded(
-          child: StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance
-                .collection('users')
-                .where('role', isEqualTo: 'pos') // Hanya tampilkan POS, jangan Admin
-                .snapshots(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator(color: Color(0xFFFFD700)));
-              }
-              
-              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                return const Center(child: Text("Belum ada staff POS.", style: TextStyle(color: Colors.grey)));
-              }
-
-              return ListView.builder(
-                padding: const EdgeInsets.all(20),
-                itemCount: snapshot.data!.docs.length,
-                itemBuilder: (context, index) {
-                  var data = snapshot.data!.docs[index];
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 15),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1E1E1E),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.white10),
-                    ),
-                    child: ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: const Color(0xFFFFD700).withOpacity(0.2),
-                        child: const Icon(Icons.badge, color: Color(0xFFFFD700)),
-                      ),
-                      title: Text(data['name'] ?? 'Staff', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                      subtitle: Text(data['email'], style: const TextStyle(color: Colors.grey)),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                        onPressed: () => _deleteUser(data.id),
-                      ),
+          // LIST USER CARD
+          Expanded(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('users')
+                  .where('role', isEqualTo: 'pos') // Hanya tampilkan POS
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Center(child: CircularProgressIndicator(color: _goldColor));
+                }
+                
+                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.people_outline_rounded, size: 60, color: Colors.grey[800]),
+                        const SizedBox(height: 10),
+                        const Text("Belum ada staff POS.", style: TextStyle(color: Colors.grey)),
+                      ],
                     ),
                   );
-                },
-              );
-            },
+                }
+
+                return ListView.builder(
+                  padding: const EdgeInsets.all(20),
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: snapshot.data!.docs.length,
+                  itemBuilder: (context, index) {
+                    var data = snapshot.data!.docs[index];
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 15),
+                      decoration: BoxDecoration(
+                        color: _cardColor,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.white.withOpacity(0.05)),
+                        boxShadow: [
+                          BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 8, offset: const Offset(0, 4)),
+                        ],
+                      ),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                        leading: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: _goldColor.withOpacity(0.1),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: _goldColor.withOpacity(0.3)),
+                          ),
+                          child: Icon(Icons.person, color: _goldColor),
+                        ),
+                        title: Text(
+                          data['name'] ?? 'Staff', 
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)
+                        ),
+                        subtitle: Row(
+                          children: [
+                            const Icon(Icons.email_outlined, color: Colors.grey, size: 14),
+                            const SizedBox(width: 5),
+                            Text(data['email'], style: TextStyle(color: Colors.grey[400], fontSize: 13)),
+                          ],
+                        ),
+                        trailing: IconButton(
+                          icon: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.redAccent.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(Icons.delete_forever_rounded, color: Colors.redAccent, size: 20),
+                          ),
+                          onPressed: () => _deleteUser(data.id, data['name'] ?? 'Staff'),
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController ctrl, IconData icon, {bool isPassword = false}) {
-    return TextField(
-      controller: ctrl,
-      obscureText: isPassword,
-      style: const TextStyle(color: Colors.white),
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon, color: const Color(0xFFFFD700)),
-        filled: true,
-        fillColor: Colors.black26,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-        labelStyle: const TextStyle(color: Colors.grey),
-      ),
+  // --- WIDGET HELPER INPUT ---
+  Widget _buildModernInput(TextEditingController controller, String label, String hint, IconData icon) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: TextStyle(color: Colors.grey.withOpacity(0.4)),
+            prefixIcon: Icon(icon, color: _goldColor, size: 20),
+            filled: true,
+            fillColor: Colors.black26,
+            contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: _goldColor)),
+          ),
+        ),
+      ],
     );
   }
 }

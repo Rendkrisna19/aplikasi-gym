@@ -2,7 +2,7 @@ import 'dart:convert'; // Untuk decode Base64 Image
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:intl/intl.dart'; // Wajib: flutter pub add intl
+import 'package:intl/intl.dart';
 
 class HomeAdminPage extends StatefulWidget {
   const HomeAdminPage({super.key});
@@ -19,7 +19,7 @@ class _HomeAdminPageState extends State<HomeAdminPage> {
   // Formatter Rupiah
   final NumberFormat _currencyFormat = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
 
-  // --- LOGIC: Hitung Pendapatan Berdasarkan Filter ---
+  // --- LOGIC: Hitung Pendapatan ---
   int _calculateRevenue(List<DocumentSnapshot> docs) {
     int total = 0;
     DateTime now = DateTime.now();
@@ -27,15 +27,12 @@ class _HomeAdminPageState extends State<HomeAdminPage> {
     for (var doc in docs) {
       Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
       
-      // Pastikan ada field 'amount' dan 'timestamp'
       if (data.containsKey('amount') && data.containsKey('timestamp')) {
         int amount = data['amount'];
         Timestamp ts = data['timestamp'];
         DateTime date = ts.toDate();
 
         bool include = false;
-        
-        // Logika Filter
         if (_selectedFilter == "Hari Ini") {
           include = date.year == now.year && date.month == now.month && date.day == now.day;
         } else if (_selectedFilter == "Bulan Ini") {
@@ -44,9 +41,7 @@ class _HomeAdminPageState extends State<HomeAdminPage> {
           include = date.year == now.year;
         }
 
-        if (include) {
-          total += amount;
-        }
+        if (include) total += amount;
       }
     }
     return total;
@@ -81,7 +76,7 @@ class _HomeAdminPageState extends State<HomeAdminPage> {
           child: ListView(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             children: [
-              // FILTER DROPDOWN
+              // FILTER SECTION
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -96,23 +91,22 @@ class _HomeAdminPageState extends State<HomeAdminPage> {
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(color: Colors.white10),
                     ),
-                    child: DropdownButton<String>(
-                      dropdownColor: const Color(0xFF2C2C2C),
-                      value: _selectedFilter,
-                      icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFFFFD700)),
-                      style: const TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.bold),
-                      underline: Container(),
-                      items: _filterOptions.map((String value) {
-                        return DropdownMenuItem<String>(
-                          value: value,
-                          child: Text(value),
-                        );
-                      }).toList(),
-                      onChanged: (newValue) {
-                        if (newValue != null) {
-                          setState(() => _selectedFilter = newValue);
-                        }
-                      },
+                    child: DropdownButtonHideUnderline( // Hilangkan garis bawah default
+                      child: DropdownButton<String>(
+                        dropdownColor: const Color(0xFF2C2C2C),
+                        value: _selectedFilter,
+                        icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFFFFD700)),
+                        style: const TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.bold, fontSize: 12),
+                        items: _filterOptions.map((String value) {
+                          return DropdownMenuItem<String>(
+                            value: value,
+                            child: Text(value),
+                          );
+                        }).toList(),
+                        onChanged: (newValue) {
+                          if (newValue != null) setState(() => _selectedFilter = newValue);
+                        },
+                      ),
                     ),
                   ),
                 ],
@@ -128,7 +122,6 @@ class _HomeAdminPageState extends State<HomeAdminPage> {
                     return _buildLoadingCard();
                   }
                   
-                  // Hitung Total
                   int revenue = 0;
                   if (snapshot.hasData) {
                     revenue = _calculateRevenue(snapshot.data!.docs);
@@ -139,38 +132,49 @@ class _HomeAdminPageState extends State<HomeAdminPage> {
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
-                        colors: [Color(0xFFFFD700), Color(0xFFFFC107)],
+                        colors: [Color(0xFFFFD700), Color(0xFFFFC107)], // Emas ke Kuning Amber
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(24),
                       boxShadow: [
-                        BoxShadow(color: const Color(0xFFFFD700).withOpacity(0.2), blurRadius: 15, offset: const Offset(0, 5))
+                        BoxShadow(color: const Color(0xFFFFD700).withOpacity(0.2), blurRadius: 20, offset: const Offset(0, 8))
                       ]
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Icon(Icons.monetization_on_outlined, color: Colors.black.withOpacity(0.6)),
-                            const SizedBox(width: 8),
-                            Text("Pendapatan $_selectedFilter", style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.bold)),
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(color: Colors.black.withOpacity(0.1), shape: BoxShape.circle),
+                                  child: const Icon(Icons.monetization_on_outlined, color: Colors.black54, size: 20),
+                                ),
+                                const SizedBox(width: 10),
+                                Text("Pendapatan $_selectedFilter", style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
+                              ],
+                            ),
+                            // Icon Trend Naik (Hiasan)
+                            Icon(Icons.trending_up, color: Colors.black.withOpacity(0.4), size: 28),
                           ],
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 20),
                         Text(
-                          _currencyFormat.format(revenue), // Format Rupiah
-                          style: const TextStyle(color: Colors.black, fontSize: 28, fontWeight: FontWeight.bold),
+                          _currencyFormat.format(revenue), 
+                          style: const TextStyle(color: Colors.black, fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: -1),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 10),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                           decoration: BoxDecoration(
                             color: Colors.black.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(8)
                           ),
-                          child: const Text("Data Real-time", style: TextStyle(color: Colors.black87, fontSize: 10, fontWeight: FontWeight.w600)),
+                          child: const Text("Update Real-time", style: TextStyle(color: Colors.black87, fontSize: 11, fontWeight: FontWeight.bold)),
                         ),
                       ],
                     ),
@@ -198,7 +202,7 @@ class _HomeAdminPageState extends State<HomeAdminPage> {
                         child: _buildStatCard(
                           "Total Member", 
                           totalMembers.toString(), 
-                          Icons.groups,
+                          Icons.groups_rounded,
                           Colors.blueAccent
                         )
                       ),
@@ -207,7 +211,7 @@ class _HomeAdminPageState extends State<HomeAdminPage> {
                         child: _buildStatCard(
                           "Member Aktif", 
                           activeMembers.toString(), 
-                          Icons.verified,
+                          Icons.verified_user_rounded,
                           Colors.greenAccent
                         )
                       ),
@@ -216,101 +220,70 @@ class _HomeAdminPageState extends State<HomeAdminPage> {
                 },
               ),
 
-              const SizedBox(height: 25),
+              const SizedBox(height: 30),
               
-              // 5. BONUS: AKTIVITAS TERBARU (Mini List)
+              // 5. RECENT TRANSACTIONS
               const Text("Aktivitas Terbaru", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 10),
+              const SizedBox(height: 15),
               _buildRecentTransactions(),
+              
+              const SizedBox(height: 30), // Bottom padding
             ],
           ),
         ),
       ],
     );
   }
-// --- WIDGET BUILDERS ---
+
+  // --- WIDGET COMPONENTS ---
 
   Widget _buildHeader() {
     final User? user = FirebaseAuth.instance.currentUser;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-      // Menggunakan StreamBuilder agar update Realtime (tanpa refresh)
+      padding: const EdgeInsets.fromLTRB(24, 60, 24, 20), // Top padding untuk status bar
       child: StreamBuilder<DocumentSnapshot>(
         stream: FirebaseFirestore.instance.collection('users').doc(user?.uid).snapshots(),
         builder: (context, snapshot) {
-          // 1. Default Value (Jika loading atau data kosong)
           String displayName = "Admin";
-          
-          // Gambar Default (Placeholder yang cocok dengan tema Black & Gold)
-          ImageProvider avatarImage = const NetworkImage(
-            "https://ui-avatars.com/api/?name=Admin&background=1E1E1E&color=FFD700&size=150"
-          );
+          ImageProvider avatarImage = const NetworkImage("https://ui-avatars.com/api/?name=Admin&background=1E1E1E&color=FFD700&size=150");
 
-          // 2. Cek Data dari Firestore
           if (snapshot.hasData && snapshot.data != null && snapshot.data!.exists) {
             var data = snapshot.data!.data() as Map<String, dynamic>;
-            
-            // Ambil Nama
             displayName = data['name'] ?? "Admin";
-
-            // 3. Logika Tampilkan Foto Base64
-            // Pastikan field-nya sama dengan di SettingsPage ('profileImage')
             String? base64String = data['profileImage']; 
             
             if (base64String != null && base64String.isNotEmpty) {
               try {
-                // Decode String Base64 menjadi Gambar Memory
                 avatarImage = MemoryImage(base64Decode(base64String));
-              } catch (e) {
-                debugPrint("Gagal decode gambar di header: $e");
-                // Jika error, dia akan tetap pakai avatarImage default di atas
-              }
+              } catch (e) { /* Ignore Error */ }
             }
           }
 
-          // 4. Render UI
           return Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    "Selamat Datang,", 
-                    style: TextStyle(color: Colors.grey, fontSize: 14)
-                  ),
+                  Text("Selamat Datang,", style: TextStyle(color: Colors.grey[400], fontSize: 14)),
                   const SizedBox(height: 4),
                   Text(
                     displayName, 
-                    style: const TextStyle(
-                      color: Colors.white, 
-                      fontSize: 22, 
-                      fontWeight: FontWeight.bold
-                    )
+                    style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)
                   ),
                 ],
               ),
               
-              // Container Foto Profil
               Container(
                 width: 55, 
                 height: 55,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: const Color(0xFF1E1E1E), // Background jika gambar transparan
-                  border: Border.all(color: const Color(0xFFFFD700), width: 2), // Border Emas
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFFFFD700).withOpacity(0.2),
-                      blurRadius: 10,
-                      spreadRadius: 1
-                    )
-                  ],
-                  image: DecorationImage(
-                    image: avatarImage, 
-                    fit: BoxFit.cover
-                  ),
+                  color: const Color(0xFF1E1E1E),
+                  border: Border.all(color: const Color(0xFFFFD700), width: 2),
+                  boxShadow: [BoxShadow(color: const Color(0xFFFFD700).withOpacity(0.2), blurRadius: 15, spreadRadius: 2)],
+                  image: DecorationImage(image: avatarImage, fit: BoxFit.cover),
                 ),
               ),
             ],
@@ -325,20 +298,25 @@ class _HomeAdminPageState extends State<HomeAdminPage> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: const Color(0xFF1E1E1E),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white10),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(color: iconColor.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: iconColor.withOpacity(0.1), 
+              borderRadius: BorderRadius.circular(12)
+            ),
             child: Icon(icon, color: iconColor, size: 24),
           ),
           const SizedBox(height: 15),
-          Text(value, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-          Text(title, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+          Text(value, style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          Text(title, style: TextStyle(color: Colors.grey[500], fontSize: 12, fontWeight: FontWeight.w500)),
         ],
       ),
     );
@@ -353,7 +331,11 @@ class _HomeAdminPageState extends State<HomeAdminPage> {
           .snapshots(),
       builder: (context, snapshot) {
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return const Center(child: Text("Belum ada transaksi.", style: TextStyle(color: Colors.grey)));
+          return Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(color: const Color(0xFF1E1E1E), borderRadius: BorderRadius.circular(16)),
+            child: const Center(child: Text("Belum ada transaksi.", style: TextStyle(color: Colors.grey))),
+          );
         }
 
         return Column(
@@ -362,18 +344,33 @@ class _HomeAdminPageState extends State<HomeAdminPage> {
             DateTime date = (data['timestamp'] as Timestamp).toDate();
             
             return Container(
-              margin: const EdgeInsets.only(bottom: 10),
+              margin: const EdgeInsets.only(bottom: 12),
               decoration: BoxDecoration(
                 color: const Color(0xFF1E1E1E),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white.withOpacity(0.05)),
               ),
               child: ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: const Color(0xFFFFD700).withOpacity(0.1),
-                  child: const Icon(Icons.receipt_long, color: Color(0xFFFFD700), size: 18),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFD700).withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.receipt_long_rounded, color: Color(0xFFFFD700), size: 20),
                 ),
-                title: Text(data['packageName'] ?? 'Paket Gym', style: const TextStyle(color: Colors.white, fontSize: 14)),
-                subtitle: Text(DateFormat('dd MMM HH:mm').format(date), style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                title: Text(
+                  data['packageName'] ?? 'Paket Gym', 
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)
+                ),
+                subtitle: Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    DateFormat('dd MMM yyyy • HH:mm').format(date), 
+                    style: TextStyle(color: Colors.grey[600], fontSize: 11)
+                  ),
+                ),
                 trailing: Text(
                   "+ ${_currencyFormat.format(data['amount'])}",
                   style: const TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.bold, fontSize: 14),
@@ -388,8 +385,12 @@ class _HomeAdminPageState extends State<HomeAdminPage> {
 
   Widget _buildLoadingCard() {
     return Container(
-      height: 150,
-      decoration: BoxDecoration(color: const Color(0xFF1E1E1E), borderRadius: BorderRadius.circular(20)),
+      height: 180,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1E1E), 
+        borderRadius: BorderRadius.circular(24)
+      ),
       child: const Center(child: CircularProgressIndicator(color: Color(0xFFFFD700))),
     );
   }

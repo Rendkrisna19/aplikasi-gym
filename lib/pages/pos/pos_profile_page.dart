@@ -67,7 +67,7 @@ class _PosProfilePageState extends State<PosProfilePage> {
     }
   }
 
-  // 3. SIMPAN PERUBAHAN
+  // 3. SIMPAN PERUBAHAN PROFILE
   Future<void> _saveProfile() async {
     setState(() => _isLoading = true);
     try {
@@ -88,9 +88,134 @@ class _PosProfilePageState extends State<PosProfilePage> {
     }
   }
 
-  // 4. LOGOUT FUNCTION
+  // 4. FITUR GANTI PASSWORD (POPUP)
+  void _showChangePasswordDialog() {
+    final oldPassCtrl = TextEditingController();
+    final newPassCtrl = TextEditingController();
+    final confirmPassCtrl = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    bool isObscure = true;
+    bool isProcessing = false;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder( // Perlu StatefulBuilder agar bisa refresh dialog (mata password)
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFF1E1E1E),
+              title: const Text("Ganti Password", style: TextStyle(color: Colors.white)),
+              content: SingleChildScrollView(
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Toggle Lihat Password
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton.icon(
+                          onPressed: () {
+                            setDialogState(() => isObscure = !isObscure);
+                          },
+                          icon: Icon(isObscure ? Icons.visibility_off : Icons.visibility, color: const Color(0xFFFFD700), size: 18),
+                          label: Text(isObscure ? "Lihat" : "Sembunyi", style: const TextStyle(color: Color(0xFFFFD700))),
+                        ),
+                      ),
+                      
+                      // Input Password Lama
+                      TextFormField(
+                        controller: oldPassCtrl,
+                        obscureText: isObscure,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: _dialogInputDecoration("Password Lama"),
+                        validator: (val) => val!.isEmpty ? "Isi password lama" : null,
+                      ),
+                      const SizedBox(height: 15),
+                      
+                      // Input Password Baru
+                      TextFormField(
+                        controller: newPassCtrl,
+                        obscureText: isObscure,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: _dialogInputDecoration("Password Baru"),
+                        validator: (val) => val!.length < 6 ? "Minimal 6 karakter" : null,
+                      ),
+                      const SizedBox(height: 15),
+                      
+                      // Konfirmasi Password Baru
+                      TextFormField(
+                        controller: confirmPassCtrl,
+                        obscureText: isObscure,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: _dialogInputDecoration("Ulangi Password Baru"),
+                        validator: (val) => val != newPassCtrl.text ? "Password tidak sama" : null,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context), 
+                  child: const Text("Batal", style: TextStyle(color: Colors.grey))
+                ),
+                ElevatedButton(
+                  onPressed: isProcessing ? null : () async {
+                    if (formKey.currentState!.validate()) {
+                      setDialogState(() => isProcessing = true);
+                      await _processChangePassword(oldPassCtrl.text, newPassCtrl.text);
+                      setDialogState(() => isProcessing = false);
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFFD700)),
+                  child: isProcessing 
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2))
+                    : const Text("Simpan", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // 5. LOGIC CHANGE PASSWORD (FIREBASE REAUTH)
+  Future<void> _processChangePassword(String oldPass, String newPass) async {
+    try {
+      User? user = FirebaseAuth.instance.currentUser;
+      String email = user!.email!;
+
+      // 1. Re-Authenticate (Wajib untuk ganti password)
+      AuthCredential credential = EmailAuthProvider.credential(email: email, password: oldPass);
+      await user.reauthenticateWithCredential(credential);
+
+      // 2. Update Password
+      await user.updatePassword(newPass);
+
+      if (mounted) {
+        Navigator.pop(context); // Tutup Dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Password Berhasil Diganti! Silakan Login Ulang."), backgroundColor: Colors.green)
+        );
+        _logout(); // Logout paksa agar aman
+      }
+    } on FirebaseAuthException catch (e) {
+      String err = "Gagal Mengganti Password";
+      if (e.code == 'wrong-password' || e.code == 'invalid-credential') err = "Password lama salah!";
+      if (e.code == 'weak-password') err = "Password terlalu lemah";
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err), backgroundColor: Colors.red));
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red));
+    }
+  }
+
+  // 6. LOGOUT FUNCTION
   Future<void> _logout() async {
-    // Tampilkan Konfirmasi Dulu
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -124,7 +249,7 @@ class _PosProfilePageState extends State<PosProfilePage> {
       appBar: AppBar(
         title: const Text("Profil Kasir", style: TextStyle(color: Colors.white)),
         backgroundColor: const Color(0xFF1E1E1E),
-        automaticallyImplyLeading: false, // Hilangkan tombol back default
+        automaticallyImplyLeading: false, 
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
@@ -174,6 +299,23 @@ class _PosProfilePageState extends State<PosProfilePage> {
             const SizedBox(height: 15),
             _buildTextField("Email Login", TextEditingController(text: currentUser?.email), Icons.email, isReadOnly: true),
 
+            const SizedBox(height: 20),
+
+            // --- BUTTON GANTI PASSWORD (BARU) ---
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: OutlinedButton.icon(
+                onPressed: _showChangePasswordDialog,
+                icon: const Icon(Icons.lock_reset, color: Color(0xFFFFD700)),
+                label: const Text("GANTI PASSWORD", style: TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.bold)),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Color(0xFFFFD700)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+
             const SizedBox(height: 40),
 
             // TOMBOL SIMPAN
@@ -214,6 +356,7 @@ class _PosProfilePageState extends State<PosProfilePage> {
     );
   }
 
+  // Styles
   Widget _buildTextField(String label, TextEditingController controller, IconData icon, {bool isReadOnly = false}) {
     return TextField(
       controller: controller,
@@ -231,6 +374,17 @@ class _PosProfilePageState extends State<PosProfilePage> {
           borderSide: const BorderSide(color: Color(0xFFFFD700)),
         ),
       ),
+    );
+  }
+
+  InputDecoration _dialogInputDecoration(String hint) {
+    return InputDecoration(
+      labelText: hint,
+      labelStyle: const TextStyle(color: Colors.grey),
+      filled: true,
+      fillColor: Colors.black26,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Colors.grey)),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFFFD700))),
     );
   }
 }

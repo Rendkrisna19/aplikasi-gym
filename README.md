@@ -20,3 +20,8 @@ samples, guidance on mobile development, and a full API reference.
 -role admin poto profile belum bisa di ganti dan di upload dan belum terhubung ke header untuk tipe data gambar menggunaakn base base 64 jangan pakai storgae firebase nanti ken tagihan
 -role pos belum bisa upload barcode melalui local storage
 -role admin belum bisa dowload barcode nya 
+
+-tombol edit manajemen akun pos masih belum bisa
+-tambhakan bottom bar untuk tambah membership di role pos
+-tambahkan banner di dashboard pos
+-tambahkan icon profie pada role pos nontifikasi nya ganti jadi profile 
