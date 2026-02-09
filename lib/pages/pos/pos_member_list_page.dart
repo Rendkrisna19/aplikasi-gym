@@ -6,7 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:screenshot/screenshot.dart';
-import 'package:image_gallery_saver/image_gallery_saver.dart';
+import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
 import 'package:path_provider/path_provider.dart';
 
 class PosMemberListPage extends StatefulWidget {
@@ -433,7 +433,7 @@ class _CardPreviewDialogState extends State<_CardPreviewDialog> {
       final Uint8List? imageBytes = await _screenshotController.capture();
       if (imageBytes != null) {
         final String fileName = "GoldenGym_${widget.name}_${DateTime.now().millisecondsSinceEpoch}";
-        final result = await ImageGallerySaver.saveImage(imageBytes, quality: 100, name: fileName);
+        final result = await ImageGallerySaverPlus.saveImage(imageBytes, quality: 100, name: fileName);
         if (mounted && (result['isSuccess'] == true || result != null)) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Kartu disimpan ke Galeri!"), backgroundColor: Colors.green));
           Navigator.pop(context);

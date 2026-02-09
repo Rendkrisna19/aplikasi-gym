@@ -5,7 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:screenshot/screenshot.dart';
-import 'package:image_gallery_saver/image_gallery_saver.dart';
+import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
 
 class RegisterMemberPage extends StatefulWidget {
   const RegisterMemberPage({super.key});
@@ -216,7 +216,7 @@ class _RegisterMemberPageState extends State<RegisterMemberPage> {
         
         // A. Simpan ke Galeri HP
         final String fileName = "GoldenGym_${DateTime.now().millisecondsSinceEpoch}";
-        final result = await ImageGallerySaver.saveImage(
+        final result = await ImageGallerySaverPlus.saveImage(
           imageBytes,
           quality: 80,
           name: fileName
