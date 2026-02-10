@@ -256,7 +256,7 @@ class _PosLayoutState extends State<PosLayout> {
                   BoxShadow(color: const Color(0xFFFFD700).withOpacity(0.4), blurRadius: 8)
                 ]
               ) : null,
-              child: Icon(
+              child: Icon( 
                 icon,
                 color: isSelected ? const Color(0xFFFFD700) : Colors.grey.withOpacity(0.5),
                 size: isSelected ? 26 : 24,

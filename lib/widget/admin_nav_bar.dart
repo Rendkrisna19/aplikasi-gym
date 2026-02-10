@@ -13,44 +13,61 @@ class AdminNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Menentukan lebar container berdasarkan lebar layar (Responsive dasar)
     double screenWidth = MediaQuery.of(context).size.width;
-    double navWidth = screenWidth > 600 ? 500 : screenWidth * 0.9; // iPad vs HP
+    // Sedikit lebih lebar agar terlihat luas tapi tetap floating
+    double navWidth = screenWidth > 600 ? 500 : screenWidth * 0.92;
 
     return Align(
       alignment: Alignment.bottomCenter,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 24, left: 20, right: 20),
-        height: 70,
+        margin: const EdgeInsets.only(bottom: 30, left: 20, right: 20),
+        height: 75, // Sedikit lebih tinggi untuk nafas layout
         width: navWidth,
         decoration: BoxDecoration(
-          // Efek Transparan Putih keabu-abuan
-          color: Colors.white.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(35),
-          border: Border.all(color: Colors.white.withOpacity(0.2), width: 1),
+          borderRadius: BorderRadius.circular(40),
+          // Gradient agar kaca terlihat lebih "hidup" dan tidak flat abu-abu
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.white.withOpacity(0.08), // Sedikit lebih terang di kiri atas
+              Colors.white.withOpacity(0.03), // Lebih transparan di kanan bawah
+            ],
+          ),
+          border: Border.all(
+            // Border sangat tipis untuk efek "pinggiran kaca"
+            color: Colors.white.withOpacity(0.15),
+            width: 1.2,
+          ),
           boxShadow: [
-            // Glow Halus
+            // Shadow hitam lembut untuk efek melayang (Depth)
             BoxShadow(
-              color: Colors.white.withOpacity(0.05),
-              blurRadius: 20,
-              spreadRadius: 2,
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 25,
+              offset: const Offset(0, 10),
+              spreadRadius: -5,
             ),
           ],
         ),
-        // Efek Blur (Kaca)
+        // ClipRRect + BackdropFilter = Kunci Glassmorphism
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(35),
+          borderRadius: BorderRadius.circular(40),
           child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildNavItem(Icons.dashboard_rounded, "Home", 0),
-                _buildNavItem(Icons.card_membership_rounded, "Paket", 1),
-                _buildNavItem(Icons.people_alt_rounded, "Member", 2),
-                 _buildNavItem(Icons.badge_rounded, "Staff", 3),
-                _buildNavItem(Icons.settings_rounded, "Setting", 4),
-              ],
+            // Blur sedikit ditingkatkan agar background di belakangnya lebih smooth
+            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              alignment: Alignment.center,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween, // Jarak otomatis rapi
+                children: [
+                  _buildNavItem(Icons.dashboard_rounded, "Home", 0),
+                  _buildNavItem(Icons.card_membership_rounded, "Paket", 1),
+                  _buildNavItem(Icons.people_alt_rounded, "Member", 2),
+                  _buildNavItem(Icons.badge_rounded, "Staff", 3),
+                  _buildNavItem(Icons.settings_rounded, "Setting", 4),
+                ],
+              ),
             ),
           ),
         ),
@@ -60,36 +77,66 @@ class AdminNavBar extends StatelessWidget {
 
   Widget _buildNavItem(IconData icon, String label, int index) {
     bool isSelected = selectedIndex == index;
+    
+    // Warna Emas
+    final Color activeColor = const Color(0xFFFFD700);
+    
     return GestureDetector(
       onTap: () => onItemSelected(index),
+      behavior: HitTestBehavior.opaque, // Agar area sentuh optimal
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.fastOutSlowIn,
+        padding: EdgeInsets.symmetric(
+          horizontal: isSelected ? 16 : 10, 
+          vertical: 10
+        ),
         decoration: isSelected
             ? BoxDecoration(
-                color: const Color(0xFFFFD700).withOpacity(0.2), // Kuning Transparan
-                borderRadius: BorderRadius.circular(20),
+                // Background saat dipilih lebih gelap sedikit/kontras
+                color: activeColor.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(30),
+                border: Border.all(color: activeColor.withOpacity(0.2), width: 1),
               )
-            : null,
-        child: Column(
+            : const BoxDecoration(
+                color: Colors.transparent, // Transparan total saat tidak dipilih
+              ),
+        child: Row( // Ubah Column jadi Row agar lebih hemat tempat vertikal (Opsional, tapi lebih rapi)
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              color: isSelected ? const Color(0xFFFFD700) : Colors.white70,
-              size: 26,
+            // Animasi Ikon Membesar sedikit saat dipilih
+            AnimatedScale(
+              scale: isSelected ? 1.1 : 1.0,
+              duration: const Duration(milliseconds: 300),
+              child: Icon(
+                icon,
+                color: isSelected ? activeColor : Colors.white.withOpacity(0.6),
+                size: 24,
+              ),
             ),
-            if (isSelected) ...[
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: Color(0xFFFFD700),
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
+            
+            // Teks hanya muncul jika dipilih (AnimatedSize handle efek slide-nya)
+            AnimatedSize(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+              child: SizedBox(
+                width: isSelected ? null : 0, // Lebar 0 jika tidak dipilih
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 8),
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.clip,
+                    style: TextStyle(
+                      color: activeColor,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
                 ),
-              )
-            ]
+              ),
+            ),
           ],
         ),
       ),
